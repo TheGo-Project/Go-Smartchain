@@ -13,12 +13,11 @@ import (
 
 // AuthMiddleware Middleware JWT function
 func AuthMiddleware(secret string) fiber.Handler {
-	slog.Info("AuthMiddleware")
-
 	//jwtTtl := time.Duration(604800) * 1_000_000_000
 	field := "Authorization"
 
 	return func(c *fiber.Ctx) error {
+		slog.Info("AuthMiddleware")
 		// Get the cookie off the request
 		tokenHeader, ok := c.GetReqHeaders()[field]
 		if !ok {

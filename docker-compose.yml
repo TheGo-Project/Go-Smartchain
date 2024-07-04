@@ -1,0 +1,44 @@
+services:
+  frontend:
+    build:
+      context: ./userInterface/front
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:4000
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:4000
+    depends_on:
+      - faucet-backend
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=gorm
+      - POSTGRES_PASSWORD=gorm
+      - POSTGRES_DB=Smartchain
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  faucet-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8545:8545"
+      - "4000:4000"
+    environment:
+      - ENV=dev
+      - FIBER_PORT=4000
+      - JWT_SECRET=96868854f4aeda9fb733b0dff15f08c7cdd04b1aadc27f0cf8e07c00ddf8a660
+      - DSN=host=db user=gorm password=gorm dbname=Smartchain sslmode=disable
+      - GETH_URL=http://localhost:8545
+      - FAUCET_ADDRESS=0x82990000f229C0E81b951Aec9c98D21ab130E40C
+    depends_on:
+      - db
+
+volumes:
+  postgres-data:

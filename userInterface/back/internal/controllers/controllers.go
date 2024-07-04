@@ -33,7 +33,7 @@ type Controller struct {
 	repo          repository.Repository
 	db            *gorm.DB
 	jwtSecret     string
-	getUrl        string
+	gethUrl       string
 	faucetAddress string
 }
 
@@ -42,7 +42,7 @@ func MakeController(repo repository.Repository, db *gorm.DB, c *config.Config) C
 		repo:          repo,
 		db:            db,
 		jwtSecret:     c.GetJwtSecret(),
-		getUrl:        c.GetGethUrl(),
+		gethUrl:       c.GetGethUrl(),
 		faucetAddress: c.GetFaucetAddress(),
 	}
 }
@@ -169,7 +169,7 @@ func (ctrl Controller) GetAccounts(c *fiber.Ctx) error {
 }
 
 func (ctrl Controller) GetAccountBalance(c *fiber.Ctx) error {
-	slog.Info("GetAccounts")
+	slog.Info("GetAccountBalance")
 
 	user := c.Locals("User").(models.User)
 
@@ -182,9 +182,13 @@ func (ctrl Controller) GetAccountBalance(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{})
 	}
 
-	client, err := ethclient.Dial(ctrl.getUrl)
+	slog.Info("GetAccountBalance", "Dial", ctrl.gethUrl)
+
+	client, err := ethclient.Dial(ctrl.gethUrl)
 	if err != nil {
 		slog.Info("Failed to connect to the Ethereum client", "err", err)
+
+		return c.Status(500).SendString(err.Error())
 	}
 	defer client.Close()
 
@@ -193,6 +197,8 @@ func (ctrl Controller) GetAccountBalance(c *fiber.Ctx) error {
 	balance, err := client.BalanceAt(context.Background(), accountAddress, nil)
 	if err != nil {
 		slog.Info("Failed to get balance", "err", err)
+
+		return c.Status(500).SendString(err.Error())
 	}
 
 	slog.Info("GetAccountBalance", "balance", balance)
@@ -210,11 +216,20 @@ func (ctrl Controller) CreateAccount(c *fiber.Ctx) error {
 
 	slog.Info("CreateAccount", "user", user.ID)
 
-	client, err := ethclient.Dial(ctrl.getUrl)
+	client, err := ethclient.Dial(ctrl.gethUrl)
 	if err != nil {
 		slog.Error("Failed to connect to the Ethereum client", "err", err)
 	}
 	defer client.Close()
+
+	slog.Info("createAccount", "client", client.Client())
+	id, err := client.ChainID(context.TODO())
+	if err != nil {
+		slog.Info("Failed to get the chain ID", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+	slog.Info("CreateAccount", "ChainID", id)
 
 	slog.Info("Connected to Ethereum client", "client", client)
 
@@ -225,7 +240,7 @@ func (ctrl Controller) CreateAccount(c *fiber.Ctx) error {
 	ks := keystore.NewKeyStore("./keystore", keystore.StandardScryptN, keystore.StandardScryptP)
 	account, err := ks.NewAccount(password)
 	if err != nil {
-		slog.Error("Failed to create new accountw", "err", err)
+		slog.Error("Failed to create new account", "err", err)
 	}
 
 	fmt.Printf("New account created: %s\n", account.Address.Hex())
@@ -339,7 +354,7 @@ func (ctrl Controller) Faucet(c *fiber.Ctx) error {
 		}
 	]`
 
-	client, err := ethclient.Dial(ctrl.getUrl)
+	client, err := ethclient.Dial(ctrl.gethUrl)
 	if err != nil {
 		slog.Error("Failed to connect to the Ethereum client", "err", err)
 	}

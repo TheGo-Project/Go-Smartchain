@@ -16,12 +16,11 @@ type JwtConfig struct {
 }
 
 type Config struct {
-	Env           string
-	Fiber         FiberConfig
-	Jwt           JwtConfig
-	Dsn           string
-	GethUrl       string
-	FaucetAddress string
+	Env     string
+	Fiber   FiberConfig
+	Jwt     JwtConfig
+	Dsn     string
+	GethUrl string
 }
 
 func NewConfig() *Config {
@@ -55,11 +54,6 @@ func NewConfig() *Config {
 		panic("GETH_URL environment variable not set")
 	}
 
-	faucetAddress := os.Getenv("FAUCET_ADDRESS")
-	if faucetAddress == "" {
-		panic("FAUCET_ADDRESS environment variable not set")
-	}
-
 	return &Config{
 		Env: env,
 		Fiber: FiberConfig{
@@ -68,9 +62,8 @@ func NewConfig() *Config {
 		Jwt: JwtConfig{
 			Secret: jwtSecret,
 		},
-		Dsn:           dsn,
-		GethUrl:       gethUrl,
-		FaucetAddress: faucetAddress,
+		Dsn:     dsn,
+		GethUrl: gethUrl,
 	}
 }
 
@@ -92,8 +85,4 @@ func (c Config) GetDsn() string {
 
 func (c Config) GetGethUrl() string {
 	return c.GethUrl
-}
-
-func (c Config) GetFaucetAddress() string {
-	return c.FaucetAddress
 }

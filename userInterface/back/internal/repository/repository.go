@@ -14,12 +14,20 @@ func MakeRepository() Repository {
 	return Repository{}
 }
 
-func (r Repository) Create(db *gorm.DB, user models.User) (models.User, error) {
+func (r Repository) CreateUser(db *gorm.DB, user models.User) (models.User, error) {
 	err := db.Create(&user).Error
 
 	slog.Info("Created user: ", "user", user)
 
 	return user, err
+}
+
+func (r Repository) GetUsersCount(db *gorm.DB) (int64, error) {
+	var count int64
+
+	err := db.Model(&models.User{}).Count(&count).Error
+
+	return count, err
 }
 
 func (r Repository) GetUserByEmail(db *gorm.DB, email string) (models.User, error) {
@@ -45,7 +53,7 @@ func (r Repository) GetAccountByID(db *gorm.DB, id string) (models.Account, erro
 	result := db.Where("id = ?", id).Find(&account)
 
 	if result.Error != nil {
-		slog.Error("GetAccountByID: ", "error", result.Error)
+		slog.Error("GetAccountByID", "error", result.Error)
 	}
 
 	return account, result.Error
@@ -56,8 +64,46 @@ func (r Repository) GetAccountsByExtID(db *gorm.DB, extID string) (models.Accoun
 	result := db.Where("ext_id = ?", extID).Find(&account)
 
 	if result.Error != nil {
-		slog.Error("GetAccountByID: ", "error", result.Error)
+		slog.Error("GetAccountsByExtID", "error", result.Error)
 	}
 
 	return account, result.Error
+}
+
+func (r Repository) GetParam(db *gorm.DB, key string) (string, error) {
+	var param models.Param
+	result := db.Where("key = ?", key).Find(&param)
+
+	if result.Error != nil {
+		slog.Error("GetParam", "error", result.Error)
+	}
+
+	return param.Value, result.Error
+}
+
+func (r Repository) SetParam(db *gorm.DB, key string, value string) (string, error) {
+	paramValue, err := r.GetParam(db, key)
+	if err != nil {
+		return "", err
+	}
+	slog.Info("SetParam", "paramValue", paramValue)
+
+	if paramValue == "" {
+		param := models.Param{Key: key, Value: value}
+
+		result := db.Create(&param)
+		if result.Error != nil {
+			slog.Info("SetParam", "error", result.Error)
+
+			return "", result.Error
+		}
+	} else {
+		err = db.Model(&models.Param{}).Where("key = ?", key).Update("value", value).Error
+		if err != nil {
+			slog.Error("SetParam", "error", err, "key", key, "value", value)
+
+			return "", err
+		}
+	}
+	return value, nil
 }

@@ -34,6 +34,7 @@ func main() {
 	app := fiber.New()
 
 	jwt := middlewares.AuthMiddleware(c.GetJwtSecret())
+	adm := middlewares.AdmMiddleware()
 
 	repo := repository.MakeRepository()
 
@@ -47,11 +48,16 @@ func main() {
 
 	app.Post("/api/v1/users/register", controller.Register)
 	app.Post("/api/v1/users/login", controller.Login)
+	app.Get("/api/v1/health/check", controller.HealthCheck)
 	app.Get("/api/v1/users/iam", jwt, controller.GetUserIam)
 	app.Post("/api/v1/accounts", jwt, controller.CreateAccount)
 	app.Get("/api/v1/accounts", jwt, controller.GetAccounts)
 	app.Get("/api/v1/accounts/:accountId/balance", jwt, controller.GetAccountBalance)
 	app.Post("/api/v1/faucet", jwt, controller.Faucet)
+	app.Get("/api/v1/params/faucet-contract-address", jwt, adm, controller.GetFaucetContractAddress)
+	app.Post("/api/v1/params/faucet-contract-address", jwt, adm, controller.SetFaucetContractAddress)
+	//app.Get("/api/v1/params/main-account-address", jwt, adm, controller.GetMainAccountAddress)
+	//app.Post("/api/v1/params/main-account-address", jwt, adm, controller.SetMainAccountAddress)
 
 	// Start the server on port .env.FIBER_PORT
 	log.Fatal(app.Listen(":" + c.GetFiberPort()))

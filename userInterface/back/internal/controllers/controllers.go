@@ -30,20 +30,18 @@ import (
 )
 
 type Controller struct {
-	repo          repository.Repository
-	db            *gorm.DB
-	jwtSecret     string
-	gethUrl       string
-	faucetAddress string
+	repo      repository.Repository
+	db        *gorm.DB
+	jwtSecret string
+	gethUrl   string
 }
 
 func MakeController(repo repository.Repository, db *gorm.DB, c *config.Config) Controller {
 	return Controller{
-		repo:          repo,
-		db:            db,
-		jwtSecret:     c.GetJwtSecret(),
-		gethUrl:       c.GetGethUrl(),
-		faucetAddress: c.GetFaucetAddress(),
+		repo:      repo,
+		db:        db,
+		jwtSecret: c.GetJwtSecret(),
+		gethUrl:   c.GetGethUrl(),
 	}
 }
 
@@ -91,9 +89,16 @@ func (ctrl Controller) Register(c *fiber.Ctx) error {
 	}
 	user.Password = string(hashedPassword)
 
-	slog.Info("Registering user", "user.Password", user.Password)
+	usersCount, err := ctrl.repo.GetUsersCount(ctrl.db)
+	if err != nil {
+		return c.Status(500).SendString(err.Error())
+	}
 
-	createdUser, err := ctrl.repo.Create(ctrl.db, user)
+	if usersCount == 0 {
+		user.Admin = true
+	}
+
+	createdUser, err := ctrl.repo.CreateUser(ctrl.db, user)
 	if err != nil {
 		return err
 	}
@@ -293,9 +298,6 @@ func (ctrl Controller) Faucet(c *fiber.Ctx) error {
 		return err
 	}
 
-	slog.Info("Faucet", "address", fr.Address)
-	slog.Info("Faucet", "password", fr.Password)
-
 	const faucetABI = `[
 		{
 			"anonymous": false,
@@ -365,7 +367,14 @@ func (ctrl Controller) Faucet(c *fiber.Ctx) error {
 		slog.Error("Failed to parse contract ABI", "err", err)
 	}
 
-	address := common.HexToAddress(ctrl.faucetAddress)
+	faucetContractAddress, err := ctrl.repo.GetParam(ctrl.db, "faucetContractAddress")
+	if err != nil || faucetContractAddress == "" {
+		slog.Info("faucetContractAddress", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	address := common.HexToAddress(faucetContractAddress)
 	contract := bind.NewBoundContract(address, contractAbi, client, client, client)
 
 	balance, err := client.BalanceAt(context.Background(), address, nil)
@@ -407,4 +416,92 @@ func withdraw(client *ethclient.Client, privateKey *ecdsa.PrivateKey, contract *
 	}
 
 	fmt.Printf("Withdrawal transaction sent: %s\n", tx.Hash().Hex())
+}
+
+func (ctrl Controller) GetParam(key string) (string, error) {
+	param, err := ctrl.repo.GetParam(ctrl.db, key)
+	if err != nil {
+		slog.Error("Failed to get faucet contract address", "err", err)
+
+		return "", err
+	}
+	return param, nil
+}
+
+func (ctrl Controller) GetFaucetContractAddress(c *fiber.Ctx) error {
+	param, err := ctrl.GetParam("faucetContractAddress")
+	if err != nil {
+		slog.Error("Failed to get faucet contract address", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	return c.JSON(fiber.Map{"value": param})
+}
+
+func (ctrl Controller) SetParam(c *fiber.Ctx, key string) (string, error) {
+	type SetRequest struct {
+		Value string `json:"value" form:"value"`
+	}
+
+	sfr := SetRequest{}
+
+	if err := c.BodyParser(&sfr); err != nil {
+		slog.Error("Failed to get faucet contract address", "err", err)
+
+		return "", err
+	}
+
+	_, err := ctrl.repo.SetParam(ctrl.db, key, sfr.Value)
+	if err != nil {
+		slog.Error("Failed to set faucet contract address", "err", err)
+
+		return "", err
+	}
+
+	return sfr.Value, nil
+}
+
+func (ctrl Controller) SetFaucetContractAddress(c *fiber.Ctx) error {
+	value, err := ctrl.SetParam(c, "faucetContractAddress")
+	if err != nil {
+		slog.Error("Failed to set faucet contract address", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	return c.JSON(fiber.Map{"value": value})
+}
+
+//func (ctrl Controller) GetMainAccountAddress(c *fiber.Ctx) error {
+//	param, err := ctrl.GetParam("mainAccountAddress")
+//	if err != nil {
+//		slog.Error("Failed to get faucet contract address", "err", err)
+//
+//		return c.Status(500).SendString(err.Error())
+//	}
+//
+//	return c.JSON(fiber.Map{"value": param})
+//}
+//
+//func (ctrl Controller) SetMainAccountAddress(c *fiber.Ctx) error {
+//	value, err := ctrl.SetParam(c, "mainAccountAddress")
+//	if err != nil {
+//		slog.Error("Failed to set faucet contract address", "err", err)
+//
+//		return c.Status(500).SendString(err.Error())
+//	}
+//
+//	return c.JSON(fiber.Map{"value": value})
+//}
+
+func (ctrl Controller) HealthCheck(c *fiber.Ctx) error {
+	count, err := ctrl.repo.GetUsersCount(ctrl.db)
+	if err != nil {
+		slog.Error("Failed to set faucet contract address", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	return c.JSON(fiber.Map{"count": count, "healthy": true})
 }

@@ -49,7 +49,7 @@ function App() {
   if (!fetching && user.id) {
     return (
       <div>
-        <div className="m-2">Hello {user.email}</div>
+        <div className="m-2">Hello, {user.email}</div>
         <div className="m-2">
           <Accounts />
         </div>

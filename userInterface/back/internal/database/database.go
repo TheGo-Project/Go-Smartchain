@@ -49,7 +49,7 @@ func New(dsn string, debug bool) (*gorm.DB, func() error, error) {
 }
 
 func Initialize(db *gorm.DB) error {
-	err := db.AutoMigrate(&models.User{}, &models.Account{})
+	err := db.AutoMigrate(&models.User{}, &models.Account{}, &models.Param{})
 
 	return err
 }

@@ -8,6 +8,7 @@ import Register from "./Register.tsx";
 import { Provider } from "react-redux";
 import { store } from "./store/store.ts";
 import Account from "./Account.tsx";
+import Admin from "./Admin.tsx";
 
 const router = createBrowserRouter([
   {
@@ -25,6 +26,10 @@ const router = createBrowserRouter([
   {
     path: "/accounts/:accountId",
     element: <Account />,
+  },
+  {
+    path: "/admin",
+    element: <Admin />,
   },
 ]);
 

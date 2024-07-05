@@ -6,7 +6,7 @@ contract Faucet {
     event Deposit(address indexed from, uint256 amount);
 
     function withdraw(uint256 withdraw_amount) public {
-        require(withdraw_amount <= 1 ether, "You can withdraw up to 1 ETH");
+        require(withdraw_amount <= 1 ether, "You can withdraw up to 1 GSMC");
 
         require(address(this).balance >= withdraw_amount, "Insufficient balance in faucet");
 

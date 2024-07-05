@@ -17,6 +17,7 @@ type User struct {
 	Password string    `json:"-"`
 	Salt     string    `json:"-"`
 	Accounts []Account `json:"accounts"`
+	Admin    bool      `json:"admin"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) (err error) {

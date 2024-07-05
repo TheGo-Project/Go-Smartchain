@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faucet-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: faucet-backend
+  template:
+    metadata:
+      labels:
+        app: faucet-backend
+    spec:
+      containers:
+        - name: faucet-backend
+          image: umair246/smartchain-backend:v6
+          ports:
+            - containerPort: 4000
+          env:
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: faucet-backend-config
+                  key: ENV
+            - name: FIBER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: faucet-backend-config
+                  key: FIBER_PORT
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: faucet-backend-secret
+                  key: JWT_SECRET
+            - name: DSN
+              valueFrom:
+                secretKeyRef:
+                  name: faucet-backend-secret
+                  key: DSN
+            - name: GETH_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: faucet-backend-config
+                  key: GETH_URL
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "2Gi"
+            limits:
+              cpu: "1000m"
+              memory: "4Gi"
+          volumeMounts:
+            - name: tmpfs-volume
+              mountPath: /tmp/data
+      volumes:
+        - name: tmpfs-volume
+          emptyDir:
+            medium: Memory

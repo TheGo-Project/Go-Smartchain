@@ -36,7 +36,6 @@ services:
       - JWT_SECRET=96868854f4aeda9fb733b0dff15f08c7cdd04b1aadc27f0cf8e07c00ddf8a660
       - DSN=host=db user=gorm password=gorm dbname=Smartchain sslmode=disable
       - GETH_URL=http://localhost:8545
-      - FAUCET_ADDRESS=0x82990000f229C0E81b951Aec9c98D21ab130E40C
     depends_on:
       - db
 

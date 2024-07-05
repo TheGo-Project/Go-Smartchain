@@ -4,7 +4,7 @@ ARG VERSION=""
 ARG BUILDNUM=""
 
 # Build Geth in a stock Go builder container
-FROM golang:1.22-alpine as builder
+FROM --platform=linux/amd64 golang:1.22-alpine as builder
 
 ENV GO111MODULE=on \
     CGO_ENABLED=0 \
@@ -20,12 +20,7 @@ RUN cd /go-ethereum && go mod download
 
 ADD . /go-ethereum
 RUN cd /go-ethereum && go run build/ci.go install -static ./cmd/geth
-
-## Pull Geth into a second stage deploy alpine container
-#FROM alpine:latest
-#
-#RUN apk add --no-cache ca-certificates
-#COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
+RUN cd /go-ethereum && go run build/ci.go install -static ./cmd/clef
 
 ## backend
 WORKDIR /app
@@ -34,12 +29,20 @@ COPY userInterface/back/go.sum .
 RUN go mod download
 COPY userInterface/back/. .
 RUN go build -o main ./cmd/server.go
-#FROM debian:bookworm-slim
 
-FROM alpine:latest
+FROM amd64/debian:bookworm-slim
 
-RUN apk add --no-cache ca-certificates
+RUN apt update && apt install -y --no-install-recommends ca-certificates curl
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt install -y nodejs && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /hardhat-project
+COPY hardhat/package*.json ./
+RUN npm install
+COPY hardhat/. .
+
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
+COPY --from=builder /go-ethereum/build/bin/clef /usr/local/bin/
 
 COPY --from=builder /app/main /main
 

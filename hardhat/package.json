@@ -15,6 +15,7 @@
   "dependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "dotenv": "^16.4.5",
+    "ethers": "^6.13.1",
     "keythereum": "^2.0.0"
   }
 }

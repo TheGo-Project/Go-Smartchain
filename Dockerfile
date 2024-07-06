@@ -32,9 +32,12 @@ RUN go build -o main ./cmd/server.go
 
 FROM amd64/debian:bookworm-slim
 
-RUN apt update && apt install -y --no-install-recommends ca-certificates curl
+RUN apt update && apt install -y --no-install-recommends ca-certificates curl supervisor
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 RUN apt install -y nodejs && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /var/log/supervisor
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 WORKDIR /hardhat-project
 COPY hardhat/package*.json ./
@@ -48,10 +51,10 @@ COPY --from=builder /app/main /main
 
 EXPOSE 8545 8546 30303 30303/udp 8080
 
-COPY wrapper.sh /wrapper.sh
-RUN chmod +x /wrapper.sh
-CMD ["sh", "/wrapper.sh"]
-#CMD sleep infinity
+#COPY wrapper.sh /wrapper.sh
+#RUN chmod +x /wrapper.sh
+#CMD ["sh", "/wrapper.sh"]
+CMD ["/usr/bin/supervisord"]
 
 # Add some metadata labels to help programmatic image consumption
 ARG COMMIT=""

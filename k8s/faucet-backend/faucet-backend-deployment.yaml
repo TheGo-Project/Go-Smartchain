@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: faucet-backend
-          image: umair246/smartchain-backend:v6
+          image: umair246/smartchain-backend:v7
           ports:
             - containerPort: 4000
           env:

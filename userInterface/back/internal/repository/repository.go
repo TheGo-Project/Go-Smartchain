@@ -70,6 +70,10 @@ func (r Repository) GetAccountsByExtID(db *gorm.DB, extID string) (models.Accoun
 	return account, result.Error
 }
 
+func (r Repository) DeleteAllAccounts(db *gorm.DB) error {
+	return db.Where("deleted_at IS NULL").Delete(&models.Account{}).Error
+}
+
 func (r Repository) GetParam(db *gorm.DB, key string) (string, error) {
 	var param models.Param
 	result := db.Where("key = ?", key).Find(&param)

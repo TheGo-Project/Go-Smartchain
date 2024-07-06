@@ -37,8 +37,6 @@ const Accounts: React.FC = () => {
         },
       })
       .then((res: AxiosResponse) => {
-        console.log(res.status);
-
         if (Array.isArray(res.data)) {
           setAccounts(res.data);
         } else {

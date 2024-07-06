@@ -5,6 +5,7 @@ import axios, { AxiosError, AxiosResponse } from "axios";
 import { useNavigate } from "react-router-dom";
 import Accounts from "./Accounts";
 import { Alert } from "react-bootstrap";
+import NavMenu from "./NavMenu";
 
 type User = {
   id?: string;
@@ -28,8 +29,6 @@ function App() {
         },
       })
       .then((res: AxiosResponse) => {
-        console.log(res.status);
-
         setUser(res.data);
 
         navigate("/");
@@ -46,24 +45,26 @@ function App() {
       });
   }, [navigate]);
 
-  if (!fetching && user.id) {
-    return (
-      <div>
-        <div className="m-2">Hello, {user.email}</div>
-        <div className="m-2">
-          <Accounts />
+  return (
+    <>
+      <NavMenu />
+  
+      {(!fetching && user.id) ? (
+        <div>
+          <div className="m-2">Hello, {user.email}</div>
+          <div className="m-2">
+            <Accounts />
+          </div>
         </div>
-      </div>
-    );
-  } else if (!fetching && showAlert) {
-    return (
-      <div className="container mt-1 max-w-screen-md">
-      <Alert variant="danger" dismissible>
-        something went wrong
-      </Alert>
-      </div>
-    );
-  }
+      ) : (!fetching && showAlert) ? (
+        <div className="container mt-1 max-w-screen-md">
+          <Alert variant="danger" dismissible>
+            something went wrong
+          </Alert>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 export default App;

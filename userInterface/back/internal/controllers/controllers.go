@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -171,6 +172,15 @@ func (ctrl Controller) GetAccounts(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(accounts)
+}
+
+func (ctrl Controller) DeleteAll(c *fiber.Ctx) error {
+	err := ctrl.repo.DeleteAllAccounts(ctrl.db)
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(fiber.Map{})
 }
 
 func (ctrl Controller) GetAccountBalance(c *fiber.Ctx) error {
@@ -377,11 +387,18 @@ func (ctrl Controller) Faucet(c *fiber.Ctx) error {
 	address := common.HexToAddress(faucetContractAddress)
 	contract := bind.NewBoundContract(address, contractAbi, client, client, client)
 
-	balance, err := client.BalanceAt(context.Background(), address, nil)
+	faucetBalance, err := client.BalanceAt(context.Background(), address, nil)
 	if err != nil {
 		slog.Error("Failed to retrieve contract balance", "err", err)
 	}
-	slog.Info("Faucet", "Contract balance", balance.String())
+	slog.Info("Faucet", "Contract balance", faucetBalance.String())
+
+	accountAddress := common.HexToAddress(fr.Address)
+	accountBalance, err := client.BalanceAt(context.Background(), accountAddress, nil)
+	if err != nil {
+		slog.Error("Failed to retrieve contract balance", "err", err)
+	}
+	slog.Info("Faucet", "Account balance", accountBalance.String())
 
 	account, err := ctrl.repo.GetAccountsByExtID(ctrl.db, fr.Address)
 	if err != nil {
@@ -399,23 +416,42 @@ func (ctrl Controller) Faucet(c *fiber.Ctx) error {
 	}
 
 	amount := big.NewInt(0.5e18) // 0.5 ETH в wei
-	withdraw(client, privateKey.PrivateKey, contract, amount)
+	err = withdraw(client, privateKey.PrivateKey, contract, amount)
+	if err != nil {
+		return c.Status(500).SendString(err.Error())
+	}
 
 	return c.JSON(fiber.Map{})
 }
 
-func withdraw(client *ethclient.Client, privateKey *ecdsa.PrivateKey, contract *bind.BoundContract, amount *big.Int) {
+func withdraw(client *ethclient.Client, privateKey *ecdsa.PrivateKey, contract *bind.BoundContract, amount *big.Int) error {
+	//gasPrice, err := client.SuggestGasPrice(context.Background())
+	//if err != nil {
+	//	slog.Error("Failed to get suggested gas price", "err", err)
+	//	return err
+	//}
+
 	auth, err := bind.NewKeyedTransactorWithChainID(privateKey, big.NewInt(1337))
 	if err != nil {
 		slog.Error("Failed to create authorized transactor", "err", err)
 	}
 
+	//gasLimit := uint64(200000)
+	//
+	//auth.Nonce = nil
+	//auth.GasLimit = gasLimit
+	//auth.GasPrice = gasPrice
+
 	tx, err := contract.Transact(auth, "withdraw", amount)
 	if err != nil {
 		slog.Error("Failed to request withdrawal", "err", err)
+
+		return err
 	}
 
 	fmt.Printf("Withdrawal transaction sent: %s\n", tx.Hash().Hex())
+
+	return nil
 }
 
 func (ctrl Controller) GetParam(key string) (string, error) {
@@ -504,4 +540,80 @@ func (ctrl Controller) HealthCheck(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"count": count, "healthy": true})
+}
+
+type Block struct {
+	Number            uint64 `json:"number"`
+	Hash              string `json:"hash"`
+	ParentHash        string `json:"parentHash"`
+	Time              uint64 `json:"time"`
+	TransactionsCount int    `json:"transactionsCount"`
+}
+
+func (ctrl Controller) GetBlocks(c *fiber.Ctx) error {
+	client, err := ethclient.Dial(ctrl.gethUrl)
+	if err != nil {
+		slog.Error("Failed to connect to the Ethereum client", "err", err)
+	}
+	defer client.Close()
+
+	latestBlockNumber, err := client.BlockNumber(context.Background())
+	if err != nil {
+		slog.Error("Failed to retrieve latest block number", "err", err)
+	}
+
+	var blocks []Block
+
+	var n uint64 = 20
+
+	if latestBlockNumber < n {
+		n = latestBlockNumber
+	}
+
+	for i := latestBlockNumber; i > latestBlockNumber-n; i-- {
+		block, err := client.BlockByNumber(context.Background(), big.NewInt(int64(i)))
+		if err != nil {
+			slog.Error("Failed to retrieve block %d", "err", err)
+		}
+
+		blocks = append(blocks, Block{
+			Number: block.Number().Uint64(),
+			Hash:   block.Hash().Hex(),
+			//ParentHash: block.ParentHash().Hex(),
+			Time: block.Time(),
+		})
+
+	}
+
+	return c.JSON(fiber.Map{"blocks": blocks})
+}
+
+func (ctrl Controller) GetBlockByNumber(c *fiber.Ctx) error {
+	client, err := ethclient.Dial(ctrl.gethUrl)
+	if err != nil {
+		slog.Error("Failed to connect to the Ethereum client", "err", err)
+	}
+	defer client.Close()
+
+	i, err := strconv.ParseInt(c.Params("blockNumber"), 10, 64)
+	if err != nil {
+		slog.Error("Failed to parse block number", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	block, err := client.BlockByNumber(context.Background(), big.NewInt(i))
+	if err != nil {
+		slog.Error("Failed to retrieve block %d", "err", err)
+
+		return c.Status(500).SendString(err.Error())
+	}
+
+	return c.JSON(Block{
+		Number:            block.Number().Uint64(),
+		Hash:              block.Hash().Hex(),
+		ParentHash:        block.ParentHash().Hex(),
+		Time:              block.Time(),
+		TransactionsCount: len(block.Transactions()),
+	})
 }

@@ -9,6 +9,8 @@ import { Provider } from "react-redux";
 import { store } from "./store/store.ts";
 import Account from "./Account.tsx";
 import Admin from "./Admin.tsx";
+import Explorer from "./Explorer.tsx";
+import Block from "./Block.tsx";
 
 const router = createBrowserRouter([
   {
@@ -30,6 +32,14 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <Admin />,
+  },
+  {
+    path: "/explorer",
+    element: <Explorer />,
+  },
+  {
+    path: "/explorer/:number",
+    element: <Block />,
   },
 ]);
 

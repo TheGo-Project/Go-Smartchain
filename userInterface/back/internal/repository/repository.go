@@ -85,14 +85,27 @@ func (r Repository) GetParam(db *gorm.DB, key string) (string, error) {
 	return param.Value, result.Error
 }
 
+func (r Repository) ParamExists(db *gorm.DB, key string) (bool, error) {
+	var exists bool
+	err := db.Model(models.Param{}).
+		Select("count(*) > 0").
+		Where("key = ?", key).
+		Find(&exists).
+		Error
+
+	return exists, err
+}
+
 func (r Repository) SetParam(db *gorm.DB, key string, value string) (string, error) {
-	paramValue, err := r.GetParam(db, key)
+	slog.Info("SetParam", "key", key, "value", value)
+
+	exists, err := r.ParamExists(db, key)
 	if err != nil {
 		return "", err
 	}
-	slog.Info("SetParam", "paramValue", paramValue)
+	slog.Info("SetParam", "exists", exists)
 
-	if paramValue == "" {
+	if !exists {
 		param := models.Param{Key: key, Value: value}
 
 		result := db.Create(&param)

@@ -169,7 +169,30 @@ func (ctrl Controller) GetFaucetContractAddress(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"value": param})
 }
 
-func (ctrl Controller) SetParam(c *fiber.Ctx, key string) (string, error) {
+//func (ctrl Controller) SetParam(c *fiber.Ctx, key string) (string, error) {
+//	type SetRequest struct {
+//		Value string `json:"value" form:"value"`
+//	}
+//
+//	sfr := SetRequest{}
+//
+//	if err := c.BodyParser(&sfr); err != nil {
+//		slog.Error("Failed to get faucet contract address", "err", err)
+//
+//		return "", err
+//	}
+//
+//	_, err := ctrl.repo.SetParam(ctrl.db, key, sfr.Value)
+//	if err != nil {
+//		slog.Error("Failed to set faucet contract address", "err", err)
+//
+//		return "", err
+//	}
+//
+//	return sfr.Value, nil
+//}
+
+func (ctrl Controller) SetFaucetContractAddress(c *fiber.Ctx) error {
 	type SetRequest struct {
 		Value string `json:"value" form:"value"`
 	}
@@ -179,25 +202,8 @@ func (ctrl Controller) SetParam(c *fiber.Ctx, key string) (string, error) {
 	if err := c.BodyParser(&sfr); err != nil {
 		slog.Error("Failed to get faucet contract address", "err", err)
 
-		return "", err
+		return c.Status(500).SendString(err.Error())
 	}
-
-	_, err := ctrl.repo.SetParam(ctrl.db, key, sfr.Value)
-	if err != nil {
-		slog.Error("Failed to set faucet contract address", "err", err)
-
-		return "", err
-	}
-
-	return sfr.Value, nil
-}
-
-func (ctrl Controller) SetFaucetContractAddress(c *fiber.Ctx) error {
-	type SetRequest struct {
-		Value string `json:"value" form:"value"`
-	}
-
-	sfr := SetRequest{}
 
 	value, err := ctrl.useCase.SetParam("faucetContractAddress", sfr.Value)
 	if err != nil {

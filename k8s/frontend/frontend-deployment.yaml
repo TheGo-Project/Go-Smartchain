@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: umair246/smartchain-frontend:v5
+          image: umair246/smartchain-frontend:latest
           ports:
             - containerPort: 3000
           env:

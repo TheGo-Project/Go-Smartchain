@@ -15,12 +15,17 @@ type JwtConfig struct {
 	Secret string
 }
 
+type RPCConfig struct {
+	Port string
+}
+
 type Config struct {
 	Env     string
 	Fiber   FiberConfig
 	Jwt     JwtConfig
 	Dsn     string
 	GethUrl string
+	Rpc     RPCConfig
 }
 
 func NewConfig() *Config {
@@ -54,6 +59,11 @@ func NewConfig() *Config {
 		panic("GETH_URL environment variable not set")
 	}
 
+	rpcPort := os.Getenv("RPC_PORT")
+	if rpcPort == "" {
+		panic("RPC_PORT environment variable not set")
+	}
+
 	return &Config{
 		Env: env,
 		Fiber: FiberConfig{
@@ -64,6 +74,9 @@ func NewConfig() *Config {
 		},
 		Dsn:     dsn,
 		GethUrl: gethUrl,
+		Rpc: RPCConfig{
+			Port: rpcPort,
+		},
 	}
 }
 
@@ -85,4 +98,8 @@ func (c Config) GetDsn() string {
 
 func (c Config) GetGethUrl() string {
 	return c.GethUrl
+}
+
+func (c Config) GetRpcPort() string {
+	return c.Rpc.Port
 }

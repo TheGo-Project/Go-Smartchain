@@ -43,6 +43,11 @@ spec:
                 configMapKeyRef:
                   name: faucet-backend-config
                   key: GETH_URL
+            - name: RPC_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: faucet-backend-config
+                  key: RPC_PORT
           resources:
             requests:
               cpu: "500m"

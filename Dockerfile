@@ -28,7 +28,7 @@ COPY userInterface/back/go.mod .
 COPY userInterface/back/go.sum .
 RUN go mod download
 COPY userInterface/back/. .
-RUN go build -o main ./cmd/server.go
+RUN go build -o main ./cmd/rest/server.go
 
 FROM amd64/debian:bookworm-slim
 

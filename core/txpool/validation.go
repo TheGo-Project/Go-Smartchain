@@ -18,10 +18,15 @@ package txpool
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
+
+	"go-smartchain/core"
 	"math/big"
 
+	"github.com/consensys/gnark-crypto/ecc"
+	"github.com/consensys/gnark/backend/groth16"
+	"github.com/consensys/gnark/frontend"
+	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -47,97 +52,45 @@ type ValidationOptions struct {
 	MinTip  *big.Int // Minimum gas tip needed to allow a transaction into the caller pool
 }
 
-// ValidateTransaction is a helper method to check whether a transaction is valid
-// according to the consensus rules, but does not check state-dependent validation
-// (balance, nonce, etc).
-//
-// This check is public to allow different transaction pools to check the basic
-// rules without duplicating code and running the risk of missed updates.
-func ValidateTransaction(tx *types.Transaction, head *types.Header, signer types.Signer, opts *ValidationOptions) error {
-	// Ensure transactions not implemented by the calling pool are rejected
-	if opts.Accept&(1<<tx.Type()) == 0 {
-		return fmt.Errorf("%w: tx type %v not supported by this pool", core.ErrTxTypeNotSupported, tx.Type())
+func ValidateTransaction(tx *types.Transaction) bool {
+	// Assume tx.Data() contains A and B
+	data := tx.Data()
+	a := data[0]
+	b := data[1]
+	c := a + b
+
+	// Generate proof
+	circuit := &core.MyCircuit{
+		A: a,
+		B: b,
+		C: c,
 	}
-	// Before performing any expensive validations, sanity check that the tx is
-	// smaller than the maximum limit the pool can meaningfully handle
-	if tx.Size() > opts.MaxSize {
-		return fmt.Errorf("%w: transaction size %v, limit %v", ErrOversizedData, tx.Size(), opts.MaxSize)
-	}
-	// Ensure only transactions that have been enabled are accepted
-	if !opts.Config.IsBerlin(head.Number) && tx.Type() != types.LegacyTxType {
-		return fmt.Errorf("%w: type %d rejected, pool not yet in Berlin", core.ErrTxTypeNotSupported, tx.Type())
-	}
-	if !opts.Config.IsLondon(head.Number) && tx.Type() == types.DynamicFeeTxType {
-		return fmt.Errorf("%w: type %d rejected, pool not yet in London", core.ErrTxTypeNotSupported, tx.Type())
-	}
-	if !opts.Config.IsCancun(head.Number, head.Time) && tx.Type() == types.BlobTxType {
-		return fmt.Errorf("%w: type %d rejected, pool not yet in Cancun", core.ErrTxTypeNotSupported, tx.Type())
-	}
-	// Check whether the init code size has been exceeded
-	if opts.Config.IsShanghai(head.Number, head.Time) && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
-		return fmt.Errorf("%w: code size %v, limit %v", core.ErrMaxInitCodeSizeExceeded, len(tx.Data()), params.MaxInitCodeSize)
-	}
-	// Transactions can't be negative. This may never happen using RLP decoded
-	// transactions but may occur for transactions created using the RPC.
-	if tx.Value().Sign() < 0 {
-		return ErrNegativeValue
-	}
-	// Ensure the transaction doesn't exceed the current block limit gas
-	if head.GasLimit < tx.Gas() {
-		return ErrGasLimit
-	}
-	// Sanity check for extremely large numbers (supported by RLP or RPC)
-	if tx.GasFeeCap().BitLen() > 256 {
-		return core.ErrFeeCapVeryHigh
-	}
-	if tx.GasTipCap().BitLen() > 256 {
-		return core.ErrTipVeryHigh
-	}
-	// Ensure gasFeeCap is greater than or equal to gasTipCap
-	if tx.GasFeeCapIntCmp(tx.GasTipCap()) < 0 {
-		return core.ErrTipAboveFeeCap
-	}
-	// Make sure the transaction is signed properly
-	if _, err := types.Sender(signer, tx); err != nil {
-		return ErrInvalidSender
-	}
-	// Ensure the transaction has more gas than the bare minimum needed to cover
-	// the transaction metadata
-	intrGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, opts.Config.IsIstanbul(head.Number), opts.Config.IsShanghai(head.Number, head.Time))
+
+	// Compile the circuit
+	cs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, circuit)
 	if err != nil {
-		return err
+		return false
 	}
-	if tx.Gas() < intrGas {
-		return fmt.Errorf("%w: gas %v, minimum needed %v", core.ErrIntrinsicGas, tx.Gas(), intrGas)
+
+	// Setup keys
+	pk, vk, err := core.Setup()
+	if err != nil {
+		return false
 	}
-	// Ensure the gasprice is high enough to cover the requirement of the calling pool
-	if tx.GasTipCapIntCmp(opts.MinTip) < 0 {
-		return fmt.Errorf("%w: gas tip cap %v, minimum needed %v", ErrUnderpriced, tx.GasTipCap(), opts.MinTip)
+
+	// Generate proof
+	proof, err := groth16.Prove(cs, pk, circuit)
+	if err != nil {
+		return false
 	}
-	if tx.Type() == types.BlobTxType {
-		// Ensure the blob fee cap satisfies the minimum blob gas price
-		if tx.BlobGasFeeCapIntCmp(blobTxMinBlobGasPrice) < 0 {
-			return fmt.Errorf("%w: blob fee cap %v, minimum needed %v", ErrUnderpriced, tx.BlobGasFeeCap(), blobTxMinBlobGasPrice)
-		}
-		sidecar := tx.BlobTxSidecar()
-		if sidecar == nil {
-			return errors.New("missing sidecar in blob transaction")
-		}
-		// Ensure the number of items in the blob transaction and various side
-		// data match up before doing any expensive validations
-		hashes := tx.BlobHashes()
-		if len(hashes) == 0 {
-			return errors.New("blobless blob transaction")
-		}
-		if len(hashes) > params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob {
-			return fmt.Errorf("too many blobs in transaction: have %d, permitted %d", len(hashes), params.MaxBlobGasPerBlock/params.BlobTxBlobGasPerBlob)
-		}
-		// Ensure commitments, proofs and hashes are valid
-		if err := validateBlobSidecar(hashes, sidecar); err != nil {
-			return err
-		}
+
+	// Verify proof
+	err = groth16.Verify(proof, vk, circuit)
+	if err != nil {
+		return false
 	}
-	return nil
+
+	return true
 }
 
 func validateBlobSidecar(hashes []common.Hash, sidecar *types.BlobTxSidecar) error {

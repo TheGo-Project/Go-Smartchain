@@ -1,0 +1,32 @@
+{
+  "alloc": {
+    "0x7d351ce4044964BD42AEA856c8365B582D08EA86": {
+      "balance": "1000000000000000000000000000"
+    },
+    "0x040dEBE371690b686Ec9703CafAa1252c78b7320": {
+      "balance": "1000000000000000000000000000"
+    }
+  },
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "config": {
+    "chainId": 10,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "isQuorum": true,
+    "maxCodeSizeConfig": [
+      { "block": 0, "size": 35 }
+    ]
+  },
+  "difficulty": "0x0",
+  "gasLimit": "0xE0000000",
+  "extraData": "",
+  "mixhash": "0x00000000000000000000000000000000000000647572616c65787365646c6578",
+  "nonce": "0x0",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "timestamp": "0x00"
+}
+
